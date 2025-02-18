@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Landing Pages - Unchained Tracker</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Landing Pages</h1>
+        
+        <div class="card">
+            <h2>Add New Landing Page</h2>
+            <form id="landingPageForm">
+                <div class="form-group">
+                    <label>Name:</label>
+                    <input type="text" id="name" required>
+                </div>
+                <div class="form-group">
+                    <label>URL:</label>
+                    <input type="text" id="url" required>
+                </div>
+                <button type="submit">Add Landing Page</button>
+            </form>
+        </div>
+
+        <div class="card">
+            <h2>Existing Landing Pages</h2>
+            <table id="landingPagesTable">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>URL</th>
+                        <th>Created</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // Load landing pages
+        async function loadLandingPages() {
+            const response = await fetch('/api/landing-pages');
+            const pages = await response.json();
+            const tbody = document.querySelector('#landingPagesTable tbody');
+            tbody.innerHTML = '';
+            
+            pages.forEach(page => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${page.name}</td>
+                    <td><a href="${page.url}" target="_blank">${page.url}</a></td>
+                    <td>${new Date(page.created_at).toLocaleString()}</td>
+                    <td>
+                        <button onclick="editPage(${page.id})">Edit</button>
+                        <button onclick="deletePage(${page.id})">Delete</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // Add new landing page
+        document.getElementById('landingPageForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const page = {
+                name: document.getElementById('name').value,
+                url: document.getElementById('url').value
+            };
+
+            try {
+                const response = await fetch('/api/landing-pages', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(page)
+                });
+
+                if (response.ok) {
+                    loadLandingPages();
+                    e.target.reset();
+                } else {
+                    alert('Error adding landing page');
+                }
+            } catch (err) {
+                console.error(err);
+                alert('Error adding landing page');
+            }
+        };
+
+        // Delete landing page
+        async function deletePage(id) {
+            if (!confirm('Are you sure you want to delete this landing page?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/landing-pages?id=${id}`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    loadLandingPages();
+                } else {
+                    alert('Error deleting landing page');
+                }
+            } catch (err) {
+                console.error(err);
+                alert('Error deleting landing page');
+            }
+        }
+
+        // Load initial data
+        loadLandingPages();
+    </script>
+</body>
+</html> 

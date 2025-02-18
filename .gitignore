@@ -1,0 +1,64 @@
+# Local development 
+
+# Binaries and build artifacts
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+/bin/
+/dist/
+
+# Go specific
+/vendor/
+
+# Environment and secrets
+.env
+*.pem
+*.key
+*.crt
+*.csr
+secrets/
+config/secrets/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+*.mmdb
+GeoLite2-City.mmdb
+
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs and temporary files
+*.log
+logs/
+tmp/
+temp/
+
+# Node modules and frontend build
+node_modules/
+/frontend/dist/
+/frontend/node_modules/
+
+# Testing and coverage
+coverage/
+*.cover
+cover.out
+
+# Local development files
+install-local.sh
+local-config.yaml
+docker-compose.override.yml
+
+# Workspace settings
+*.code-workspace
+.workspace/ 

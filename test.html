@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Tracker Test</title>
+    <script src="http://localhost:8080/static/tracker.min.js"></script>
+</head>
+<body>
+    <h1>Tracker Test</h1>
+    <button onclick="testConversion()">Test Conversion</button>
+    <button onclick="checkStats()">Check Stats</button>
+
+    <script>
+        // Initialize tracker
+        const tracker = new AffiliateTracker({
+            endpoint: 'http://localhost:8080',
+            campaignId: 'test-campaign'
+        });
+
+        // Track visit on page load
+        tracker.trackVisit().then(console.log).catch(console.error);
+
+        // Test conversion
+        async function testConversion() {
+            try {
+                const result = await tracker.trackConversion(99.99);
+                console.log('Conversion tracked:', result);
+                alert('Conversion tracked!');
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error tracking conversion');
+            }
+        }
+
+        // Check stats
+        async function checkStats() {
+            try {
+                const response = await fetch('http://localhost:8080/api/dashboard/stats');
+                const stats = await response.json();
+                console.log('Stats:', stats);
+                alert(`Visits today: ${stats.today_visits}\nTotal conversions: ${stats.total_conversions}`);
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error checking stats');
+            }
+        }
+    </script>
+</body>
+</html> 

@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Conversion Stats</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container mt-4">
+        <h1>Conversion Stats</h1>
+        
+        <div class="row mt-4">
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Total Conversions</h5>
+                        <h2 id="totalConversions">-</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Total Revenue</h5>
+                        <h2 id="totalRevenue">-</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Average Amount</h5>
+                        <h2 id="averageAmount">-</h2>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-4">
+            <h3>Recent Conversions</h3>
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Campaign</th>
+                            <th>Amount</th>
+                            <th>Device</th>
+                            <th>Browser</th>
+                            <th>Time</th>
+                        </tr>
+                    </thead>
+                    <tbody id="conversionsTable">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function loadStats() {
+            try {
+                const response = await fetch('/api/stats');
+                const data = await response.json();
+                
+                document.getElementById('totalConversions').textContent = data.summary.total_conversions;
+                document.getElementById('totalRevenue').textContent = '$' + data.summary.total_revenue.toFixed(2);
+                document.getElementById('averageAmount').textContent = '$' + data.summary.average_amount.toFixed(2);
+                
+                const tableHtml = data.conversions.map(conv => `
+                    <tr>
+                        <td>${conv.id}</td>
+                        <td>${conv.campaign_name}</td>
+                        <td>$${conv.amount.toFixed(2)}</td>
+                        <td>${conv.visitor_info.device_type}</td>
+                        <td>${conv.visitor_info.browser} (${conv.visitor_info.os})</td>
+                        <td>${new Date(conv.created_at).toLocaleString()}</td>
+                    </tr>
+                `).join('');
+                
+                document.getElementById('conversionsTable').innerHTML = tableHtml;
+            } catch (error) {
+                console.error('Error loading stats:', error);
+            }
+        }
+
+        // Load stats on page load and every 30 seconds
+        loadStats();
+        setInterval(loadStats, 30000);
+    </script>
+</body>
+</html>

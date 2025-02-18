@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Manage Offers</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Manage Offers</h1>
+        
+        <div class="form-container">
+            <h2>Add New Offer</h2>
+            <form id="offerForm">
+                <div class="form-group">
+                    <label for="name">Offer Name:</label>
+                    <input type="text" id="name" name="name" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="network">Network:</label>
+                    <input type="text" id="network" name="network" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="offer_url">Offer URL:</label>
+                    <input type="url" id="offer_url" name="offer_url" required>
+                </div>
+                
+                <button type="submit">Add Offer</button>
+            </form>
+        </div>
+
+        <div class="table-container">
+            <h2>Existing Offers</h2>
+            <table id="offersTable">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Network</th>
+                        <th>URL</th>
+                        <th>Created</th>
+                    </tr>
+                </thead>
+                <tbody>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // Load existing offers
+        function loadOffers() {
+            fetch('/api/offers')
+                .then(response => response.json())
+                .then(offers => {
+                    const tbody = document.querySelector('#offersTable tbody');
+                    tbody.innerHTML = '';
+                    
+                    offers.forEach(offer => {
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                            <td>${offer.name}</td>
+                            <td>${offer.network}</td>
+                            <td><a href="${offer.offer_url}" target="_blank">${offer.offer_url}</a></td>
+                            <td>${new Date(offer.created_at).toLocaleString()}</td>
+                        `;
+                        tbody.appendChild(row);
+                    });
+                });
+        }
+
+        // Handle form submission
+        document.getElementById('offerForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = {
+                name: document.getElementById('name').value,
+                network: document.getElementById('network').value,
+                offer_url: document.getElementById('offer_url').value
+            };
+
+            fetch('/api/offers', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(formData)
+            })
+            .then(response => response.json())
+            .then(() => {
+                // Clear form and reload offers
+                e.target.reset();
+                loadOffers();
+            })
+            .catch(error => console.error('Error:', error));
+        });
+
+        // Initial load
+        loadOffers();
+    </script>
+</body>
+</html> 
