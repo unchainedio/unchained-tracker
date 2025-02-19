@@ -36,49 +36,37 @@ sudo apt-get update
 check_status "Updating package list"
 
 # Check and install Go if needed
-MIN_GO_VERSION="1.18"
+# Read required Go version from go.mod
+REQUIRED_GO_VERSION=$(grep "^go " go.mod | cut -d' ' -f2)
+echo "Required Go version from go.mod: $REQUIRED_GO_VERSION"
 
 if ! command -v go &> /dev/null; then
-    echo "Installing Go..."
-    sudo apt-get install -y golang-go
+    echo "Installing Go $REQUIRED_GO_VERSION..."
+    # Download and install specific Go version
+    wget "https://golang.org/dl/go$REQUIRED_GO_VERSION.linux-amd64.tar.gz"
+    sudo rm -rf /usr/local/go
+    sudo tar -C /usr/local -xzf "go$REQUIRED_GO_VERSION.linux-amd64.tar.gz"
+    rm "go$REQUIRED_GO_VERSION.linux-amd64.tar.gz"
+    # Add to PATH if not already there
+    if [[ ":$PATH:" != *":/usr/local/go/bin:"* ]]; then
+        echo "export PATH=\$PATH:/usr/local/go/bin" >> ~/.bashrc
+        export PATH=$PATH:/usr/local/go/bin
+    fi
     check_status "Installing Go"
 else
-    echo "✅ Go already installed ($(go version))"
+    CURRENT_GO_VERSION=$(go version | awk '{print $3}' | sed 's/go//')
+    echo "Go $CURRENT_GO_VERSION is installed"
+    if [ "$CURRENT_GO_VERSION" != "$REQUIRED_GO_VERSION" ]; then
+        echo "Updating Go to required version $REQUIRED_GO_VERSION..."
+        wget "https://golang.org/dl/go$REQUIRED_GO_VERSION.linux-amd64.tar.gz"
+        sudo rm -rf /usr/local/go
+        sudo tar -C /usr/local -xzf "go$REQUIRED_GO_VERSION.linux-amd64.tar.gz"
+        rm "go$REQUIRED_GO_VERSION.linux-amd64.tar.gz"
+        check_status "Updating Go"
+    else
+        echo "✅ Go version matches requirement"
+    fi
 fi
-
-# Check Go version and update go.mod if needed
-GO_VERSION=$(go version | awk '{print $3}' | sed 's/go//')
-echo "Detected Go version: $GO_VERSION"
-
-# Extract major and minor versions for comparison
-CURRENT_MAJOR=$(echo $GO_VERSION | cut -d. -f1)
-CURRENT_MINOR=$(echo $GO_VERSION | cut -d. -f2)
-MIN_MAJOR=$(echo $MIN_GO_VERSION | cut -d. -f1)
-MIN_MINOR=$(echo $MIN_GO_VERSION | cut -d. -f2)
-
-# Compare versions
-if [ "$CURRENT_MAJOR" -lt "$MIN_MAJOR" ] || ([ "$CURRENT_MAJOR" -eq "$MIN_MAJOR" ] && [ "$CURRENT_MINOR" -lt "$MIN_MINOR" ]); then
-    echo "❌ Error: Go version $GO_VERSION is too old"
-    echo "Minimum required version is $MIN_GO_VERSION"
-    echo "Please upgrade Go using:"
-    echo "  sudo apt-get update"
-    echo "  sudo apt-get install --only-upgrade golang-go"
-    exit 1
-fi
-echo "✅ Go version $GO_VERSION meets minimum requirement ($MIN_GO_VERSION)"
-
-# Update go.mod to match installed Go version
-echo "Updating go.mod to match system Go version..."
-sed -i "s/go 1\.[0-9]\+\.[0-9]\+/go $GO_VERSION/" go.mod
-check_status "Updating go.mod"
-
-# Verify go.mod is valid
-if ! go mod verify; then
-    echo "❌ Error: Invalid go.mod file"
-    echo "Please check go.mod manually"
-    exit 1
-fi
-check_status "Verifying go.mod"
 
 # Only install MySQL if not already installed
 if ! command -v mysql &> /dev/null; then
