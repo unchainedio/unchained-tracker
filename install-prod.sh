@@ -69,6 +69,14 @@ if ! mysql -u root -p"$MYSQL_ROOT_PASSWORD" -e "USE $DB_NAME" 2>/dev/null; then
     mysql -u root -p"$MYSQL_ROOT_PASSWORD" -e "CREATE DATABASE IF NOT EXISTS $DB_NAME;"
     check_status "Creating database"
     
+    # Lower MySQL password policy requirements
+    echo "Configuring MySQL password policy..."
+    mysql -u root -p"$MYSQL_ROOT_PASSWORD" -e "
+        SET GLOBAL validate_password.policy=LOW;
+        SET GLOBAL validate_password.length=6;
+    "
+    check_status "Setting password policy"
+    
     # Create user only if it doesn't exist
     if ! mysql -u root -p"$MYSQL_ROOT_PASSWORD" -e "SELECT User FROM mysql.user WHERE User='$DB_USER'" 2>/dev/null | grep -q $DB_USER; then
         echo "Creating database user $DB_USER..."
