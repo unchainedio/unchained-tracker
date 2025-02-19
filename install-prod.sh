@@ -71,11 +71,13 @@ gvm use "go$REQUIRED_GO_VERSION"
 check_status "Setting Go version"
 
 # Verify correct version is being used
-CURRENT_GO_VERSION=$(go version | awk '{print $3}' | sed 's/go//')
+# Extract version from "go version go1.24.0 linux/amd64"
+CURRENT_GO_VERSION=$(go version | cut -d' ' -f3 | sed 's/^go//')
 if [ "$CURRENT_GO_VERSION" != "$REQUIRED_GO_VERSION" ]; then
     echo "❌ Error: Wrong Go version in use"
     echo "Expected: $REQUIRED_GO_VERSION"
     echo "Got: $CURRENT_GO_VERSION"
+    echo "Version strings: '$CURRENT_GO_VERSION' vs '$REQUIRED_GO_VERSION'"
     exit 1
 else
     echo "✅ Using Go $REQUIRED_GO_VERSION"
