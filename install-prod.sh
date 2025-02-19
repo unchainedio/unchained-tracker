@@ -10,6 +10,33 @@ check_status() {
     fi
 }
 
+# Function to clean up existing installation
+cleanup_service() {
+    echo "🧹 Cleaning up existing installation..."
+    
+    # Stop and disable service if it exists
+    if systemctl is-active --quiet unchained-tracker; then
+        echo "Stopping existing service..."
+        sudo systemctl stop unchained-tracker
+        sudo systemctl disable unchained-tracker
+        check_status "Stopping service"
+    fi
+    
+    # Kill any lingering processes
+    if pgrep -f "tracker$" > /dev/null; then
+        echo "Cleaning up old processes..."
+        sudo pkill -f "tracker$"
+        sleep 2  # Give processes time to exit
+    fi
+    
+    # Remove old service file
+    if [ -f /etc/systemd/system/unchained-tracker.service ]; then
+        echo "Removing old service file..."
+        sudo rm /etc/systemd/system/unchained-tracker.service
+        sudo systemctl daemon-reload
+    fi
+}
+
 # Load environment variables
 if [ ! -f .env ]; then
     echo "Error: .env file not found"
@@ -19,6 +46,9 @@ source .env
 check_status "Loading environment variables"
 echo "Using database: $DB_NAME"
 echo "Using user: $DB_USER"
+
+# Run cleanup before installation
+cleanup_service
 
 # Check if DOMAIN is set in .env
 if [ -z "$DOMAIN" ]; then
@@ -248,18 +278,27 @@ check_status "Reloading systemd configuration"
 sudo systemctl enable unchained-tracker
 check_status "Enabling tracker service"
 
-sudo systemctl start unchained-tracker
-check_status "Starting tracker service"
-
-# Verify service is running
-echo "Verifying service status..."
-if systemctl is-active --quiet unchained-tracker; then
-    echo "✅ Tracker service is running"
-else
-    echo "❌ Error: Tracker service failed to start"
-    echo "Check logs with: sudo journalctl -u unchained-tracker"
+# Start service with proper error handling
+echo "Starting service..."
+if ! sudo systemctl start unchained-tracker; then
+    echo "❌ Service failed to start. Checking logs..."
+    sudo journalctl -u unchained-tracker -n 50
     exit 1
 fi
+
+# Wait for service to be fully running
+echo "Waiting for service to start..."
+for i in {1..10}; do
+    if curl -s http://127.0.0.1:${SERVER_PORT}/ > /dev/null; then
+        echo "✅ Service is responding"
+        break
+    fi
+    if [ $i -eq 10 ]; then
+        echo "❌ Service not responding after 10 seconds"
+        exit 1
+    fi
+    sleep 1
+done
 
 echo "✨ Installation complete!"
 echo "🌐 Tracker is now available at: http://$DOMAIN"
