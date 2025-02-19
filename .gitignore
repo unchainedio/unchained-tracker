@@ -62,7 +62,4 @@ docker-compose.override.yml
 # Workspace settings
 *.code-workspace
 .workspace/
-
-# Environment variables
-.env
-.env.* 
+ 
