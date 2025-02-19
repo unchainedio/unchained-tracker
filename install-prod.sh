@@ -188,7 +188,7 @@ After=network.target mysql.service
 Type=simple
 User=$USER
 WorkingDirectory=$(pwd)
-Environment=DATABASE_URL=tracker:tvojkralje@tcp(localhost:3306)/unchained_tracker
+Environment=DATABASE_URL=${DB_USER}:${DB_PASSWORD}@tcp(${DB_HOST}:${DB_PORT})/${DB_NAME}
 Environment="SERVER_ADDR=$SERVER_ADDR"
 ExecStart=$(pwd)/tracker
 Restart=always
@@ -205,6 +205,9 @@ sudo a2enmod proxy_http
 sudo a2enmod headers
 check_status "Enabling Apache modules"
 
+# Extract port from SERVER_ADDR
+SERVER_PORT=$(echo $SERVER_ADDR | cut -d':' -f2)
+
 # Create Apache virtual host
 echo "Creating virtual host for $DOMAIN..."
 sudo tee /etc/apache2/sites-available/$DOMAIN.conf << EOF
@@ -212,8 +215,8 @@ sudo tee /etc/apache2/sites-available/$DOMAIN.conf << EOF
     ServerName $DOMAIN
     
     ProxyPreserveHost On
-    ProxyPass / http://127.0.0.1:8088/
-    ProxyPassReverse / http://127.0.0.1:8088/
+    ProxyPass / http://127.0.0.1:${SERVER_PORT}/
+    ProxyPassReverse / http://127.0.0.1:${SERVER_PORT}/
     
     RequestHeader set X-Forwarded-Proto "http"
     RequestHeader set X-Real-IP %{REMOTE_ADDR}s
