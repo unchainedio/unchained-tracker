@@ -104,8 +104,9 @@ func main() {
             w.Header().Set("Content-Type", "text/css")
         } else if strings.HasSuffix(r.URL.Path, ".js") {
             w.Header().Set("Content-Type", "application/javascript")
+        } else if strings.HasSuffix(r.URL.Path, ".ico") {
+            w.Header().Set("Content-Type", "image/x-icon")
         }
-        // Strip /static/ prefix and serve the file
         r.URL.Path = strings.TrimPrefix(r.URL.Path, "/static/")
         fileServer.ServeHTTP(w, r)
     })
