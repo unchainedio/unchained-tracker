@@ -35,6 +35,15 @@ echo "📦 Installing dependencies..."
 sudo apt-get update
 check_status "Updating package list"
 
+# Check and install Go if needed
+if ! command -v go &> /dev/null; then
+    echo "Installing Go..."
+    sudo apt-get install -y golang-go
+    check_status "Installing Go"
+else
+    echo "✅ Go already installed ($(go version))"
+fi
+
 # Only install MySQL if not already installed
 if ! command -v mysql &> /dev/null; then
     echo "Installing MySQL server..."
@@ -44,23 +53,30 @@ else
     echo "✅ MySQL already installed"
 fi
 
-echo "Installing Go and Apache..."
-sudo apt-get install -y golang-go apache2
-check_status "Installing Go and Apache"
+# Check and install Apache if needed
+if ! command -v apache2 &> /dev/null; then
+    echo "Installing Apache..."
+    sudo apt-get install -y apache2
+    check_status "Installing Apache"
+else
+    echo "✅ Apache already installed ($(apache2 -v | head -n1))"
+fi
 
 # Check if database exists
 echo "🔧 Setting up MySQL..."
-if ! mysql -u root -e "USE $DB_NAME" 2>/dev/null; then
+if ! mysql -u root -p"$MYSQL_ROOT_PASSWORD" -e "USE $DB_NAME" 2>/dev/null; then
     echo "Creating database $DB_NAME..."
-    sudo mysql -e "CREATE DATABASE IF NOT EXISTS $DB_NAME;"
+    mysql -u root -p"$MYSQL_ROOT_PASSWORD" -e "CREATE DATABASE IF NOT EXISTS $DB_NAME;"
     check_status "Creating database"
     
     # Create user only if it doesn't exist
-    if ! mysql -u root -e "SELECT User FROM mysql.user WHERE User='$DB_USER'" 2>/dev/null | grep -q $DB_USER; then
+    if ! mysql -u root -p"$MYSQL_ROOT_PASSWORD" -e "SELECT User FROM mysql.user WHERE User='$DB_USER'" 2>/dev/null | grep -q $DB_USER; then
         echo "Creating database user $DB_USER..."
-        sudo mysql -e "CREATE USER '$DB_USER'@'$DB_HOST' IDENTIFIED BY '$DB_PASSWORD';"
-        sudo mysql -e "GRANT ALL PRIVILEGES ON $DB_NAME.* TO '$DB_USER'@'$DB_HOST';"
-        sudo mysql -e "FLUSH PRIVILEGES;"
+        mysql -u root -p"$MYSQL_ROOT_PASSWORD" -e "
+            CREATE USER '$DB_USER'@'$DB_HOST' IDENTIFIED BY '$DB_PASSWORD';
+            GRANT ALL PRIVILEGES ON $DB_NAME.* TO '$DB_USER'@'$DB_HOST';
+            FLUSH PRIVILEGES;
+        "
         check_status "Creating database user"
     fi
 else
