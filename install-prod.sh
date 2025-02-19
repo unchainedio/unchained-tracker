@@ -93,10 +93,32 @@ fi
 
 # Test database connection
 echo "Testing database connection..."
+echo "Attempting to connect with:"
+echo "  User: $DB_USER"
+echo "  Host: $DB_HOST:$DB_PORT"
+echo "  Database: $DB_NAME"
+
+# First test MySQL service status
+if ! systemctl is-active --quiet mysql; then
+    echo "❌ Error: MySQL service is not running"
+    echo "Starting MySQL service..."
+    sudo systemctl start mysql
+    check_status "Starting MySQL service"
+fi
+
+# Test connection with verbose output
+MYSQL_TEST=$(mysql -u "$DB_USER" -p"$DB_PASSWORD" -h "$DB_HOST" "$DB_NAME" -e "SELECT 1" 2>&1)
 if mysql -u "$DB_USER" -p"$DB_PASSWORD" -h "$DB_HOST" "$DB_NAME" -e "SELECT 1" &>/dev/null; then
     echo "✅ Database connection successful"
 else
     echo "❌ Error: Could not connect to database"
+    echo "Error details: $MYSQL_TEST"
+    echo ""
+    echo "Debugging steps:"
+    echo "1. Check if MySQL is running: systemctl status mysql"
+    echo "2. Verify credentials in .env file"
+    echo "3. Try connecting manually: mysql -u $DB_USER -p"
+    echo "4. Check MySQL logs: sudo tail -f /var/log/mysql/error.log"
     exit 1
 fi
 
