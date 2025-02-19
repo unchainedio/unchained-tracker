@@ -143,14 +143,7 @@ func main() {
     // API routes
     mux.HandleFunc("/track", func(w http.ResponseWriter, r *http.Request) {
         w.Header().Set("Content-Type", "application/json")
-        err := server.HandleVisit(w, r)
-        if err != nil {
-            json.NewEncoder(w).Encode(map[string]interface{}{
-                "error": err.Error(),
-                "status": "error",
-            })
-            return
-        }
+        server.HandleVisit(w, r)
     })
     mux.HandleFunc("/click", func(w http.ResponseWriter, r *http.Request) {
         // Get campaign token from query
