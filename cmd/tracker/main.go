@@ -142,15 +142,12 @@ func main() {
     
     // API routes
     mux.HandleFunc("/track", func(w http.ResponseWriter, r *http.Request) {
-        // Set JSON content type
         w.Header().Set("Content-Type", "application/json")
-
-        // ... existing code ...
-
+        err := server.HandleVisit(w, r)
         if err != nil {
             json.NewEncoder(w).Encode(map[string]interface{}{
                 "error": err.Error(),
-                "status": "error"
+                "status": "error",
             })
             return
         }
