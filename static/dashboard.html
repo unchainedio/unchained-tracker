@@ -71,34 +71,33 @@
                 document.getElementById('totalConversions').textContent = data.total_conversions;
                 document.getElementById('revenue').textContent = '$' + data.revenue.toFixed(2);
                 
-                const visitsHtml = data.recent_visits.map(visit => \`
+                const visitsHtml = data.recent_visits.map(visit => `
                     <div class="visit-card">
                         <div class="section">
                             <div class="section-title">Basic Info</div>
-                            ID: \${visit.visitor_id}<br>
-                            Campaign: \${visit.campaign_id || 'N/A'}<br>
-                            Time: \${new Date(visit.meta.created_at).toLocaleString()}
+                            Visitor ID: ${visit.visitor_id}<br>
+                            Campaign: ${visit.campaign_id}
                         </div>
                         
                         <div class="section">
-                            <div class="section-title">Device</div>
-                            Type: \${visit.device.type}<br>
-                            Browser: \${visit.device.browser}
+                            <div class="section-title">Device Info</div>
+                            Type: ${visit.device.type}<br>
+                            Browser: ${visit.device.browser}
                         </div>
                         
                         <div class="section">
                             <div class="section-title">Page Info</div>
-                            URL: \${visit.page.url}<br>
-                            Referrer: \${visit.page.referrer || 'Direct'}
+                            URL: ${visit.page.url}<br>
+                            Referrer: ${visit.page.referrer || 'Direct'}
                         </div>
                         
-                        \${visit.conversions.length ? \`
+                        ${visit.conversions.length ? `
                             <div class="conversion">
-                                Conversion: $\${visit.conversions[0].amount}
+                                Conversion: $${visit.conversions[0].amount}
                             </div>
-                        \` : ''}
+                        ` : ''}
                     </div>
-                \`).join('');
+                `).join('');
                 
                 document.getElementById('recentVisits').innerHTML = visitsHtml;
             } catch (error) {

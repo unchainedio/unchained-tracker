@@ -11,6 +11,8 @@ type Config struct {
     FacebookEnabled bool
     FacebookToken  string
     FacebookPixelID string
+    CloudflareToken string
+    ServerIP        string
 }
 
 func Load() (*Config, error) {
@@ -23,6 +25,8 @@ func Load() (*Config, error) {
         FacebookEnabled: getEnv("FB_ENABLED", "false") == "true",
         FacebookToken:   getEnv("FB_ACCESS_TOKEN", ""),
         FacebookPixelID: getEnv("FB_PIXEL_ID", ""),
+        CloudflareToken: os.Getenv("CLOUDFLARE_TOKEN"),
+        ServerIP:        os.Getenv("SERVER_IP"),
     }, nil
 }
 

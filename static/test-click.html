@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Click Tracking Test</title>
+    <style>
+        body { font-family: Arial; padding: 20px; }
+        .test-link {
+            display: block;
+            margin: 20px 0;
+            padding: 10px;
+            background: #007bff;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+        }
+        .results {
+            margin-top: 20px;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Click Tracking Test</h1>
+    
+    <!-- Static test link -->
+    <div>
+        <h3>Quick Test Link:</h3>
+        <a href="http://trk.local:8080/click?rtkck=1234567890" class="test-link">
+            Test Click (Static)
+        </a>
+        <p>Uses default test campaign token: 1234567890</p>
+    </div>
+
+    <hr>
+
+    <h3>Dynamic Test Links:</h3>
+    <div id="testLinks"></div>
+    
+    <div class="results">
+        <h3>Click Results:</h3>
+        <pre id="results">No clicks recorded yet</pre>
+    </div>
+
+    <script>
+        // Use the test campaign that was created in migrations
+        fetch('/api/campaigns')
+        .then(res => res.json())
+        .then(campaigns => {
+            // Find the test campaign
+            const campaign = campaigns.find(c => c.name === 'Test Campaign');
+            if (!campaign) {
+                throw new Error('Test campaign not found');
+            }
+            return {
+                campaign_id: campaign.campaign_id,
+                campaign_token: '1234567890' // Static token from migrations
+            };
+        })
+        .then(campaign => {
+            // Create test link
+            const link = document.createElement('a');
+            link.href = `http://localhost:8080/click?rtkck=${campaign.campaign_token}`;
+            link.className = 'test-link';
+            link.textContent = 'Test Click';
+            document.getElementById('testLinks').appendChild(link);
+
+            // Add campaign info
+            const info = document.createElement('div');
+            info.innerHTML = `
+                <p>Campaign ID: ${campaign.campaign_id}</p>
+                <p>Campaign Token: ${campaign.campaign_token}</p>
+            `;
+            document.getElementById('testLinks').appendChild(info);
+        })
+        .catch(error => {
+            console.error('Error creating campaign:', error);
+            document.getElementById('testLinks').innerHTML = `
+                <div class="error">Error: ${error.message}</div>
+            `;
+        });
+
+        // Poll for clicks
+        setInterval(() => {
+            fetch('/debug/clicks')
+                .then(res => res.json())
+                .then(data => {
+                    document.getElementById('results').textContent = 
+                        JSON.stringify(data, null, 2);
+                });
+        }, 1000);
+    </script>
+</body>
+</html> 

@@ -17,15 +17,28 @@ var All = []Migration{
         Version:     1,
         Description: "Create initial tables",
         SQL: `
+            /* Create landing pages table first */
+            CREATE TABLE IF NOT EXISTS landing_page (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                name VARCHAR(100) NOT NULL,
+                url VARCHAR(500) NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE KEY unique_url (url)
+            );
+
+            /* Then create campaign table with foreign key */
             CREATE TABLE IF NOT EXISTS campaign (
                 id INT AUTO_INCREMENT PRIMARY KEY,
                 name VARCHAR(100) NOT NULL,
                 campaign_id VARCHAR(36) UNIQUE,
-                landing_page VARCHAR(500),
+                campaign_token VARCHAR(10) UNIQUE,
+                offer_url VARCHAR(500),
+                landing_page_id INT,
                 traffic_source VARCHAR(100),
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (landing_page_id) REFERENCES landing_page(id)
             );
-            
+
             CREATE TABLE IF NOT EXISTS visit (
                 id INT AUTO_INCREMENT PRIMARY KEY,
                 visitor_id VARCHAR(36) UNIQUE,
@@ -68,8 +81,23 @@ var All = []Migration{
             );
 
             /* Insert test campaign */
-            INSERT IGNORE INTO campaign (name, campaign_id, landing_page, traffic_source) 
-            VALUES ('Test Campaign', 'test-campaign', 'http://localhost:8080/test', 'test');
+            INSERT IGNORE INTO campaign (
+                name, 
+                campaign_id, 
+                campaign_token,
+                offer_url,
+                landing_page_id,
+                traffic_source,
+                created_at
+            ) VALUES (
+                'Test Campaign',
+                'test-campaign',
+                '1234567890',
+                'http://localhost:8080/test-offer',
+                NULL,
+                'test',
+                CURRENT_TIMESTAMP
+            );
         `,
     },
     {
@@ -101,41 +129,28 @@ var All = []Migration{
         `,
     },
     {
-        Version:     4,
-        Description: "Add landing_pages table",
+        Version: 6,
+        Description: "Add tracking domains and clicks",
         SQL: `
-            /* Create landing pages table */
-            CREATE TABLE IF NOT EXISTS landing_page (
+            CREATE TABLE IF NOT EXISTS tracking_domain (
                 id INT AUTO_INCREMENT PRIMARY KEY,
-                name VARCHAR(100) NOT NULL,
-                url VARCHAR(500) NOT NULL,
-                template_path VARCHAR(500) NOT NULL,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                UNIQUE KEY unique_url (url)
+                domain VARCHAR(255) NOT NULL UNIQUE,
+                cloudflare_zone_id VARCHAR(32),
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
             );
 
-            /* Migrate existing landing pages */
-            INSERT IGNORE INTO landing_page (name, url, template_path)
-            SELECT 
-                CONCAT('Landing Page for ', name),
-                landing_page,
-                'static/test.html'
-            FROM campaign 
-            WHERE landing_page IS NOT NULL;
-
-            /* Update campaign table to reference landing_page */
-            ALTER TABLE campaign 
-            ADD COLUMN landing_page_id INT,
-            ADD FOREIGN KEY (landing_page_id) REFERENCES landing_page(id),
-            DROP COLUMN landing_page;
-        `,
-    },
-    {
-        Version:     5,
-        Description: "Remove template_path from landing_pages",
-        SQL: `
-            ALTER TABLE landing_page
-            DROP COLUMN template_path;
+            CREATE TABLE IF NOT EXISTS click (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                click_id VARCHAR(32) NOT NULL UNIQUE,
+                visitor_id VARCHAR(36) NOT NULL,
+                campaign_token VARCHAR(10) NOT NULL,
+                campaign_id VARCHAR(36),
+                ip_address VARCHAR(45),
+                user_agent VARCHAR(500),
+                referrer VARCHAR(500),
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (campaign_id) REFERENCES campaign(campaign_id)
+            );
         `,
     },
 }

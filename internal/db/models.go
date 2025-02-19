@@ -47,6 +47,8 @@ type Campaign struct {
 	ID            int64     `json:"id"`
 	Name          string    `json:"name"`
 	CampaignID    string    `json:"campaign_id"`
+	CampaignToken string    `json:"campaign_token"`
+	OfferURL      string    `json:"offer_url"`
 	LandingPage   string    `json:"landing_page"`
 	TrafficSource string    `json:"traffic_source"`
 	CreatedAt     time.Time `json:"created_at"`
@@ -56,6 +58,7 @@ type CampaignStats struct {
 	ID            int64     `json:"id"`
 	Name          string    `json:"name"`
 	CampaignID    string    `json:"campaign_id"`
+	CampaignToken string    `json:"campaign_token"`
 	LandingPage   string    `json:"landing_page"`
 	TrafficSource string    `json:"traffic_source"`
 	CreatedAt     time.Time `json:"created_at"`
@@ -77,4 +80,23 @@ type LandingPage struct {
 	Name         string    `json:"name"`
 	URL          string    `json:"url"`
 	CreatedAt    time.Time `json:"created_at"`
+}
+
+type Click struct {
+	ID            int64     `json:"id"`
+	ClickID       string    `json:"click_id"`
+	VisitorID     string    `json:"visitor_id"`
+	CampaignToken string    `json:"campaign_token"`
+	CampaignID    string    `json:"campaign_id"`
+	IPAddress     string    `json:"ip_address"`
+	UserAgent     string    `json:"user_agent"`
+	Referrer      string    `json:"referrer"`
+	CreatedAt     time.Time `json:"created_at"`
+}
+
+type TrackingDomain struct {
+	ID              int64     `json:"id"`
+	Domain          string    `json:"domain"`
+	CloudflareZoneID string  `json:"cloudflare_zone_id"`
+	CreatedAt       time.Time `json:"created_at"`
 } 

@@ -5,6 +5,7 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 	"fmt"
 	"time"
+	"github.com/go-sql-driver/mysql"
 )
 
 // Database wraps the sql.DB connection
@@ -19,7 +20,36 @@ func (db *Database) DB() *sql.DB {
 
 // Connect creates a new database connection
 func Connect(dsn string) (*Database, error) {
-	db, err := sql.Open("mysql", dsn)
+	fmt.Printf("Connecting with DSN: %s\n", dsn)  // Debug print
+
+	// Parse the DSN
+	cfg, err := mysql.ParseDSN(dsn)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing DSN: %v", err)
+	}
+
+	// Store database name and remove it from config
+	dbName := cfg.DBName
+	cfg.DBName = ""
+
+	// Create base DSN without database
+	baseDSN := cfg.FormatDSN()
+
+	// First connect to MySQL without database
+	db, err := sql.Open("mysql", baseDSN)
+	if err != nil {
+		return nil, err
+	}
+	defer db.Close()
+
+	// Create database if it doesn't exist
+	_, err = db.Exec("CREATE DATABASE IF NOT EXISTS " + dbName)
+	if err != nil {
+		return nil, fmt.Errorf("error creating database: %v", err)
+	}
+
+	// Now connect to the database with full DSN
+	db, err = sql.Open("mysql", dsn)
 	if err != nil {
 		return nil, err
 	}

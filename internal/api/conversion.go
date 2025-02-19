@@ -36,6 +36,21 @@ type FacebookEvent struct {
     AccessToken string `json:"access_token"`
 }
 
+// Facebook cookie helper functions
+func getFBCookie(r *http.Request) string {
+    if cookie, err := r.Cookie("_fbc"); err == nil {
+        return cookie.Value
+    }
+    return ""
+}
+
+func getFBPCookie(r *http.Request) string {
+    if cookie, err := r.Cookie("_fbp"); err == nil {
+        return cookie.Value
+    }
+    return ""
+}
+
 func (s *Server) HandleConversion(w http.ResponseWriter, r *http.Request) {
     if r.Method != http.MethodPost {
         http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -71,7 +86,7 @@ func (s *Server) HandleConversion(w http.ResponseWriter, r *http.Request) {
     }
 
     // Optional: Send to Facebook Conversion API
-    if s.cfg.FacebookEnabled {
+    if s.config.FacebookEnabled {
         go s.sendToFacebook(conversion, r)
     }
 
@@ -87,7 +102,7 @@ func (s *Server) HandleConversion(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) sendToFacebook(conversion *db.Conversion, r *http.Request) error {
-    if !s.cfg.FacebookEnabled {
+    if !s.config.FacebookEnabled {
         return nil
     }
 
@@ -106,6 +121,8 @@ func (s *Server) sendToFacebook(conversion *db.Conversion, r *http.Request) erro
                 "user_data": map[string]interface{}{
                     "client_ip_address": visit.IPAddress,
                     "client_user_agent": visit.UserAgent,
+                    "fbc":              getFBCookie(r),
+                    "fbp":              getFBPCookie(r),
                 },
                 "custom_data": map[string]interface{}{
                     "value": conversion.Amount,
@@ -115,7 +132,8 @@ func (s *Server) sendToFacebook(conversion *db.Conversion, r *http.Request) erro
                 },
             },
         },
-        "access_token": s.cfg.FacebookToken,
+        "access_token": s.config.FacebookToken,
+        "pixel_id":     s.config.FacebookPixelID,
     }
 
     // Send to Facebook
@@ -124,7 +142,7 @@ func (s *Server) sendToFacebook(conversion *db.Conversion, r *http.Request) erro
         return fmt.Errorf("error marshaling event: %v", err)
     }
 
-    url := fmt.Sprintf("https://graph.facebook.com/v13.0/%s/events", s.cfg.FacebookPixelID)
+    url := fmt.Sprintf("https://graph.facebook.com/v13.0/%s/events", s.config.FacebookPixelID)
     resp, err := http.Post(url, "application/json", bytes.NewBuffer(jsonData))
     if err != nil {
         return fmt.Errorf("error sending to Facebook: %v", err)

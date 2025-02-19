@@ -7,15 +7,15 @@ import (
 )
 
 type Server struct {
-	db  *db.Database
-	cfg *config.Config
-	geo *geo.Service
+	db     *db.Database
+	config *config.Config
+	geo    *geo.Service
 }
 
-func NewServer(database *db.Database, config *config.Config, geo *geo.Service) *Server {
+func NewServer(db *db.Database, config *config.Config, geo *geo.Service) *Server {
 	return &Server{
-		db:  database,
-		cfg: config,
-		geo: geo,
+		db:     db,
+		config: config,
+		geo:    geo,
 	}
 } 

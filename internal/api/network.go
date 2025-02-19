@@ -63,7 +63,7 @@ func (s *Server) HandleNetworkPostback(w http.ResponseWriter, r *http.Request) {
     log.Printf("Saved conversion: id=%d amount=%.2f", conversion.ID, conversion.Amount)
 
     // Optional: Send to Facebook
-    if s.cfg.FacebookEnabled {
+    if s.config.FacebookEnabled {
         go s.sendToFacebook(conversion, r)
     }
 

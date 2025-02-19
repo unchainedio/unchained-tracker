@@ -8,6 +8,7 @@ import (
     "net/http"
     "strings"
     "time"
+    "github.com/google/uuid"
     
     "unchained-tracker/internal/api"
     "unchained-tracker/internal/config"
@@ -140,6 +141,57 @@ func main() {
     
     // API routes
     mux.HandleFunc("/track", server.HandleVisit)
+    mux.HandleFunc("/click", func(w http.ResponseWriter, r *http.Request) {
+        // Get campaign token from query
+        token := r.URL.Query().Get("rtkck")
+        if token == "" {
+            http.Error(w, "Missing campaign token", http.StatusBadRequest)
+            return
+        }
+
+        // Look up campaign by token
+        var campaignID string
+        var offerURL string
+        log.Printf("Looking up campaign with token: %s", token)
+        err := database.QueryRow(
+            "SELECT campaign_id, offer_url FROM campaign WHERE campaign_token = ?", 
+            token,
+        ).Scan(&campaignID, &offerURL)
+        if err != nil {
+            log.Printf("Error finding campaign: %v", err)
+            http.Error(w, "Invalid campaign token", http.StatusBadRequest)
+            return
+        }
+        log.Printf("Found campaign: id=%s, offer_url=%s", campaignID, offerURL)
+
+        // Generate click ID
+        clickID := fmt.Sprintf("%x", time.Now().UnixNano())
+
+        // Save click
+        _, err = database.Exec(`
+            INSERT INTO click (
+                click_id, visitor_id, campaign_token, 
+                campaign_id, ip_address, user_agent, referrer
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            clickID,
+            uuid.New().String(), // Generate visitor ID
+            token,
+            campaignID,
+            r.RemoteAddr,
+            r.UserAgent(),
+            r.Referer(),
+        )
+        if err != nil {
+            log.Printf("Error saving click: %v", err)
+            http.Error(w, "Error tracking click", http.StatusInternalServerError)
+            return
+        }
+
+        // Redirect to offer URL with click ID
+        redirectURL := fmt.Sprintf("%s?clickid=%s&source=%s", 
+            offerURL, clickID, campaignID)
+        http.Redirect(w, r, redirectURL, http.StatusFound)
+    })
     mux.HandleFunc("/postback", server.HandleConversion)
     mux.HandleFunc("/network/postback", server.HandleNetworkPostback)
     mux.HandleFunc("/api/campaigns", server.HandleCampaigns)
@@ -626,6 +678,122 @@ func main() {
         http.ServeFile(w, r, "static/landing_pages.html")
     })
     mux.HandleFunc("/api/landing-pages", server.HandleLandingPages)
+    mux.HandleFunc("/api/tracking-domains", server.HandleTrackingDomains)
+
+    // Debug endpoints
+    mux.HandleFunc("/test-click", func(w http.ResponseWriter, r *http.Request) {
+        http.ServeFile(w, r, "static/test-click.html")
+    })
+
+    mux.HandleFunc("/debug/clicks", func(w http.ResponseWriter, r *http.Request) {
+        log.Printf("Fetching click debug data")
+        rows, err := database.Query(`
+            SELECT 
+                c.id,
+                c.click_id,
+                c.campaign_token,
+                c.campaign_id,
+                c.ip_address,
+                DATE_FORMAT(c.created_at, '%Y-%m-%d %H:%i:%s') as created_at,
+                camp.name as campaign_name,
+                COALESCE(camp.offer_url, 'http://localhost:8080/test-offer') as offer_url
+            FROM click c
+            LEFT JOIN campaign camp ON c.campaign_id = camp.campaign_id
+            ORDER BY c.created_at DESC
+            LIMIT 10
+        `)
+        if err != nil {
+            log.Printf("Error querying clicks: %v", err)
+            http.Error(w, err.Error(), http.StatusInternalServerError)
+            return
+        }
+        defer rows.Close()
+
+        var clicks []map[string]interface{}
+        for rows.Next() {
+            var (
+                id            int64
+                clickID       string
+                campaignToken string
+                campaignID    string
+                ipAddress     string
+                createdAt     string
+                campaignName  string
+                offerURL      string
+            )
+            
+            err := rows.Scan(
+                &id,
+                &clickID,
+                &campaignToken,
+                &campaignID,
+                &ipAddress,
+                &createdAt,
+                &campaignName,
+                &offerURL,
+            )
+            if err != nil {
+                log.Printf("Error scanning row: %v", err)
+                continue
+            }
+            
+            click := map[string]interface{}{
+                "id":             id,
+                "click_id":       clickID,
+                "campaign_token": campaignToken,
+                "campaign_id":    campaignID,
+                "ip_address":     ipAddress,
+                "created_at":     createdAt,
+                "campaign_name":  campaignName,
+                "offer_url":      offerURL,
+            }
+            
+            clicks = append(clicks, click)
+        }
+
+        w.Header().Set("Content-Type", "application/json")
+        json.NewEncoder(w).Encode(clicks)
+    })
+
+    // Test endpoints
+    mux.HandleFunc("/test-offer", func(w http.ResponseWriter, r *http.Request) {
+        w.Header().Set("Content-Type", "text/html")
+        fmt.Fprintf(w, `
+            <h1>Test Offer Page</h1>
+            <p>Click ID: %s</p>
+            <p>Campaign: %s</p>
+            <pre>%s</pre>
+            <hr>
+            <h2>Test Actions</h2>
+            <button onclick="testConversion()">Track Conversion ($99.99)</button>
+            <script>
+                async function testConversion() {
+                    try {
+                        const clickId = new URLSearchParams(window.location.search).get('clickid');
+                        const response = await fetch('/postback', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                click_id: clickId,
+                                amount: 99.99
+                            })
+                        });
+                        if (response.ok) {
+                            alert('Conversion tracked successfully!');
+                        } else {
+                            alert('Error tracking conversion');
+                        }
+                    } catch (error) {
+                        alert('Error: ' + error.message);
+                    }
+                }
+            </script>
+        `,
+        r.URL.Query().Get("clickid"),
+        r.URL.Query().Get("source"),
+        fmt.Sprintf("%+v", r.URL.Query()),
+    )
+    })
 
     // Start server
     log.Printf("Server starting on %s", cfg.ServerAddr)

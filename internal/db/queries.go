@@ -6,6 +6,7 @@ import (
     "fmt"
     "strings"
     "log"
+    "math/rand"
 )
 
 func (db *Database) SaveVisit(v *Visit) error {
@@ -155,20 +156,32 @@ func (db *Database) GetRecentVisitsWithConversions(limit int) ([]*Visit, error) 
 }
 
 func (db *Database) GetCampaignStats() ([]CampaignStats, error) {
+    log.Printf("Getting campaign stats")
     query := `
         SELECT 
-            c.*,
+            c.id,
+            c.name,
+            c.campaign_id,
+            c.campaign_token,
+            COALESCE(lp.url, '') as landing_page,
+            c.traffic_source,
+            DATE_FORMAT(c.created_at, '%Y-%m-%d %H:%i:%s') as created_at,
             COUNT(DISTINCT v.id) as visits,
             COUNT(DISTINCT conv.id) as conversions,
             COALESCE(SUM(conv.amount), 0) as revenue
         FROM campaign c
+        LEFT JOIN landing_page lp ON c.landing_page_id = lp.id
         LEFT JOIN visit v ON c.campaign_id = v.campaign_id
         LEFT JOIN conversion conv ON v.visitor_id = conv.visitor_id
-        GROUP BY c.id
+        GROUP BY c.id, c.name, c.campaign_id, c.campaign_token,
+                 lp.url, c.traffic_source, c.created_at
+        ORDER BY c.created_at DESC
     `
     
+    log.Printf("Running query: %s", query)
     rows, err := db.Query(query)
     if err != nil {
+        log.Printf("Error querying campaigns: %v", err)
         return nil, err
     }
     defer rows.Close()
@@ -176,13 +189,19 @@ func (db *Database) GetCampaignStats() ([]CampaignStats, error) {
     var stats []CampaignStats
     for rows.Next() {
         var s CampaignStats
+        var createdAtStr string
         err := rows.Scan(
-            &s.ID, &s.Name, &s.CampaignID, &s.LandingPage,
-            &s.TrafficSource, &s.CreatedAt, &s.Visits,
-            &s.Conversions, &s.Revenue,
+            &s.ID, &s.Name, &s.CampaignID, &s.CampaignToken,
+            &s.LandingPage, &s.TrafficSource, &createdAtStr,
+            &s.Visits, &s.Conversions, &s.Revenue,
         )
         if err != nil {
             return nil, err
+        }
+        // Parse the timestamp
+        s.CreatedAt, err = time.Parse("2006-01-02 15:04:05", createdAtStr)
+        if err != nil {
+            return nil, fmt.Errorf("error parsing timestamp: %v", err)
         }
         stats = append(stats, s)
     }
@@ -270,17 +289,28 @@ func (db *Database) GetVisitByClickID(clickID string) (*Visit, error) {
     return visit, nil
 }
 
+func generateCampaignToken() string {
+    // Generate 10-digit number
+    return fmt.Sprintf("%010d", rand.Int63n(10000000000))
+}
+
 func (db *Database) SaveCampaign(c *Campaign) error {
+    log.Printf("Saving campaign: %+v", c)
+    
+    c.CampaignToken = generateCampaignToken()
     query := `
         INSERT INTO campaign (
-            name, campaign_id, landing_page, traffic_source, created_at
-        ) VALUES (?, ?, ?, ?, ?)
+            name, campaign_id, campaign_token, offer_url,
+            traffic_source, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?)
     `
     
     result, err := db.Exec(query,
-        c.Name, c.CampaignID, c.LandingPage, c.TrafficSource, c.CreatedAt,
+        c.Name, c.CampaignID, c.CampaignToken, c.OfferURL,
+        c.TrafficSource, c.CreatedAt,
     )
     if err != nil {
+        log.Printf("Database error: %v", err)
         return err
     }
     
@@ -608,4 +638,94 @@ func (db *Database) DeleteLandingPage(id int64) error {
     query := "DELETE FROM landing_page WHERE id = ?"
     _, err := db.Exec(query, id)
     return err
+}
+
+func (db *Database) GetCampaignByToken(token string) (*Campaign, error) {
+    query := `
+        SELECT id, name, campaign_id, campaign_token, offer_url, landing_page, traffic_source, created_at
+        FROM campaign
+        WHERE campaign_token = ?
+    `
+    
+    campaign := new(Campaign)
+    var createdAtStr string
+    err := db.QueryRow(query, token).Scan(
+        &campaign.ID, &campaign.Name, &campaign.CampaignID, &campaign.CampaignToken,
+        &campaign.OfferURL, &campaign.LandingPage, &campaign.TrafficSource, &createdAtStr,
+    )
+    if err != nil {
+        return nil, err
+    }
+
+    campaign.CreatedAt, err = time.Parse("2006-01-02 15:04:05", createdAtStr)
+    if err != nil {
+        return nil, err
+    }
+
+    return campaign, nil
+}
+
+func (db *Database) SaveClick(c *Click) error {
+    query := `
+        INSERT INTO click (
+            click_id, visitor_id, campaign_token, campaign_id,
+            ip_address, user_agent, referrer
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+    `
+    
+    _, err := db.Exec(query,
+        c.ClickID, c.VisitorID, c.CampaignToken, c.CampaignID,
+        c.IPAddress, c.UserAgent, c.Referrer,
+    )
+    return err
+}
+
+func (db *Database) SaveTrackingDomain(d *TrackingDomain) error {
+    query := `
+        INSERT INTO tracking_domain (domain, cloudflare_zone_id)
+        VALUES (?, ?)
+    `
+    
+    result, err := db.Exec(query, d.Domain, d.CloudflareZoneID)
+    if err != nil {
+        return err
+    }
+
+    id, err := result.LastInsertId()
+    if err != nil {
+        return err
+    }
+
+    d.ID = id
+    return nil
+}
+
+func (db *Database) GetTrackingDomains() ([]*TrackingDomain, error) {
+    query := `
+        SELECT id, domain, cloudflare_zone_id, created_at
+        FROM tracking_domain
+        ORDER BY created_at DESC
+    `
+    
+    rows, err := db.Query(query)
+    if err != nil {
+        return nil, err
+    }
+    defer rows.Close()
+
+    var domains []*TrackingDomain
+    for rows.Next() {
+        d := new(TrackingDomain)
+        var createdAtStr string
+        err := rows.Scan(&d.ID, &d.Domain, &d.CloudflareZoneID, &createdAtStr)
+        if err != nil {
+            return nil, err
+        }
+        d.CreatedAt, err = time.Parse("2006-01-02 15:04:05", createdAtStr)
+        if err != nil {
+            return nil, err
+        }
+        domains = append(domains, d)
+    }
+    return domains, nil
 }

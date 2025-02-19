@@ -1,5 +1,12 @@
 #!/bin/bash
 
+# Load environment variables
+if [ ! -f .env ]; then
+    echo "Error: .env file not found"
+    exit 1
+fi
+source .env
+
 # Check if domain argument is provided
 if [ -z "$1" ]; then
     echo "Usage: $0 <domain>"
@@ -8,43 +15,67 @@ if [ -z "$1" ]; then
 fi
 
 DOMAIN=$1
+echo "Installing Unchained Tracker on domain: $DOMAIN"
 
-# Create service user and directory
-sudo useradd -r -s /bin/false tracker
-sudo mkdir -p /opt/tracker
-sudo chown tracker:tracker /opt/tracker
+# Install required packages
+echo "Installing dependencies..."
+sudo apt-get update
+# Only install MySQL if not already installed
+if ! command -v mysql &> /dev/null; then
+    sudo apt-get install -y mysql-server
+fi
+sudo apt-get install -y golang-go apache2
 
-# Copy files to installation directory
-cp -r * /opt/tracker/
-cd /opt/tracker
+# Check if database exists
+echo "Setting up MySQL..."
+if ! mysql -u root -e "USE unchained_tracker" 2>/dev/null; then
+    echo "Creating database unchained_tracker..."
+    sudo mysql -e "CREATE DATABASE IF NOT EXISTS unchained_tracker;"
+    
+    # Create user only if it doesn't exist
+    if ! mysql -u root -e "SELECT User FROM mysql.user WHERE User='tracker'" 2>/dev/null | grep -q tracker; then
+        echo "Creating database user..."
+        sudo mysql -e "CREATE USER '$DB_USER'@'$DB_HOST' IDENTIFIED BY '$DB_PASSWORD';"
+        sudo mysql -e "GRANT ALL PRIVILEGES ON $DB_NAME.* TO '$DB_USER'@'$DB_HOST';"
+        sudo mysql -e "FLUSH PRIVILEGES;"
+    fi
+else
+    echo "Database unchained_tracker already exists, skipping database creation"
+fi
 
-# Create systemd service file
-sudo cat > /etc/systemd/system/tracker.service << EOF
+# Build the application
+echo "Building application..."
+go build -o tracker cmd/tracker/main.go
+
+# Create systemd service
+echo "Creating systemd service..."
+# Update database URL to use tracker user instead of root
+sudo tee /etc/systemd/system/unchained-tracker.service << EOF
 [Unit]
 Description=Unchained Tracker
 After=network.target mysql.service
 
 [Service]
 Type=simple
-User=tracker
-Group=tracker
-WorkingDirectory=/opt/tracker
-ExecStart=/opt/tracker/bin/tracker
+User=$USER
+WorkingDirectory=$(pwd)
+Environment="DATABASE_URL=$DB_USER:$DB_PASSWORD@tcp($DB_HOST:$DB_PORT)/$DB_NAME"
+Environment="SERVER_ADDR=$SERVER_ADDR"
+ExecStart=$(pwd)/tracker
 Restart=always
-Environment=SERVER_ADDR=127.0.0.1:8080
-Environment=DATABASE_URL=user:pass@tcp(localhost:3306)/tracker
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
 # Enable Apache modules
+echo "Configuring Apache..."
 sudo a2enmod proxy
 sudo a2enmod proxy_http
 sudo a2enmod headers
 
 # Create Apache virtual host
-sudo cat > /etc/apache2/sites-available/$DOMAIN.conf << EOF
+sudo tee /etc/apache2/sites-available/$DOMAIN.conf << EOF
 <VirtualHost *:80>
     ServerName $DOMAIN
     
@@ -64,10 +95,11 @@ EOF
 sudo a2ensite $DOMAIN
 sudo apache2ctl configtest && sudo systemctl reload apache2
 
-# Start tracker service
+# Reload systemd and start service
 sudo systemctl daemon-reload
-sudo systemctl enable tracker
-sudo systemctl start tracker
+sudo systemctl enable unchained-tracker
+sudo systemctl start unchained-tracker
 
 echo "Installation complete!"
-echo "Tracker is now available at: http://$DOMAIN" 
+echo "Tracker is now available at: http://$DOMAIN"
+echo "Check status with: sudo systemctl status unchained-tracker" 
