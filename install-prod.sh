@@ -212,8 +212,8 @@ sudo tee /etc/apache2/sites-available/$DOMAIN.conf << EOF
     ServerName $DOMAIN
     
     ProxyPreserveHost On
-    ProxyPass / http://127.0.0.1:8080/
-    ProxyPassReverse / http://127.0.0.1:8080/
+    ProxyPass / http://127.0.0.1:8081/
+    ProxyPassReverse / http://127.0.0.1:8081/
     
     RequestHeader set X-Forwarded-Proto "http"
     RequestHeader set X-Real-IP %{REMOTE_ADDR}s
