@@ -68,27 +68,27 @@ if ! mysql -u root -p"$MYSQL_ROOT_PASSWORD" -e "USE $DB_NAME" 2>/dev/null; then
     echo "Creating database $DB_NAME..."
     mysql -u root -p"$MYSQL_ROOT_PASSWORD" -e "CREATE DATABASE IF NOT EXISTS $DB_NAME;"
     check_status "Creating database"
-    
-    # Lower MySQL password policy requirements
-    echo "Configuring MySQL password policy..."
-    mysql -u root -p"$MYSQL_ROOT_PASSWORD" -e "
-        SET GLOBAL validate_password.policy=LOW;
-        SET GLOBAL validate_password.length=6;
-    "
-    check_status "Setting password policy"
-    
-    # Create user only if it doesn't exist
-    if ! mysql -u root -p"$MYSQL_ROOT_PASSWORD" -e "SELECT User FROM mysql.user WHERE User='$DB_USER'" 2>/dev/null | grep -q $DB_USER; then
-        echo "Creating database user $DB_USER..."
-        mysql -u root -p"$MYSQL_ROOT_PASSWORD" -e "
-            CREATE USER '$DB_USER'@'$DB_HOST' IDENTIFIED BY '$DB_PASSWORD';
-            GRANT ALL PRIVILEGES ON $DB_NAME.* TO '$DB_USER'@'$DB_HOST';
-            FLUSH PRIVILEGES;
-        "
-        check_status "Creating database user"
-    fi
 else
     echo "✅ Database $DB_NAME already exists"
+fi
+
+# Always recreate the user and permissions to ensure they're correct
+echo "Setting up database user..."
+mysql -u root -p"$MYSQL_ROOT_PASSWORD" -e "
+    DROP USER IF EXISTS '$DB_USER'@'$DB_HOST';
+    CREATE USER '$DB_USER'@'$DB_HOST' IDENTIFIED BY '$DB_PASSWORD';
+    GRANT ALL PRIVILEGES ON $DB_NAME.* TO '$DB_USER'@'$DB_HOST';
+    FLUSH PRIVILEGES;
+"
+check_status "Setting up database user and permissions"
+
+# Verify user creation
+echo "Verifying user creation..."
+if mysql -u root -p"$MYSQL_ROOT_PASSWORD" -e "SELECT User FROM mysql.user WHERE User='$DB_USER'" | grep -q $DB_USER; then
+    echo "✅ Database user verified"
+else
+    echo "❌ Error: Database user not created properly"
+    exit 1
 fi
 
 # Test database connection
