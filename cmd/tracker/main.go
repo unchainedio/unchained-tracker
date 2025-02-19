@@ -141,7 +141,20 @@ func main() {
     })
     
     // API routes
-    mux.HandleFunc("/track", server.HandleVisit)
+    mux.HandleFunc("/track", func(w http.ResponseWriter, r *http.Request) {
+        // Set JSON content type
+        w.Header().Set("Content-Type", "application/json")
+
+        // ... existing code ...
+
+        if err != nil {
+            json.NewEncoder(w).Encode(map[string]interface{}{
+                "error": err.Error(),
+                "status": "error"
+            })
+            return
+        }
+    })
     mux.HandleFunc("/click", func(w http.ResponseWriter, r *http.Request) {
         // Get campaign token from query
         token := r.URL.Query().Get("rtkck")
