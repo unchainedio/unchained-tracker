@@ -3,6 +3,7 @@ package config
 import (
     "os"
     "github.com/joho/godotenv"
+    "fmt"
 )
 
 type Config struct {
@@ -20,8 +21,13 @@ func Load() (*Config, error) {
     godotenv.Load()
 
     return &Config{
-        DatabaseURL:     getEnv("DATABASE_URL", "unchained_user:dev_password@tcp(localhost:3306)/unchained_tracker"),
-        ServerAddr:      getEnv("SERVER_ADDR", ":8080"),
+        DatabaseURL:     getEnv("DATABASE_URL", fmt.Sprintf("%s:%s@tcp(%s:%s)/%s", 
+            getEnv("DB_USER", "tracker"),
+            getEnv("DB_PASSWORD", ""),
+            getEnv("DB_HOST", "localhost"),
+            getEnv("DB_PORT", "3306"),
+            getEnv("DB_NAME", "unchained_tracker"))),
+        ServerAddr:      getEnv("SERVER_ADDR", "127.0.0.1:8080"),
         FacebookEnabled: getEnv("FB_ENABLED", "false") == "true",
         FacebookToken:   getEnv("FB_ACCESS_TOKEN", ""),
         FacebookPixelID: getEnv("FB_PIXEL_ID", ""),

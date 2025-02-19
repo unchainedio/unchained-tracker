@@ -188,7 +188,7 @@ After=network.target mysql.service
 Type=simple
 User=$USER
 WorkingDirectory=$(pwd)
-Environment="DATABASE_URL=$DB_USER:$DB_PASSWORD@tcp($DB_HOST:$DB_PORT)/$DB_NAME"
+Environment=DATABASE_URL=tracker:tvojkralje@tcp(localhost:3306)/unchained_tracker
 Environment="SERVER_ADDR=$SERVER_ADDR"
 ExecStart=$(pwd)/tracker
 Restart=always
