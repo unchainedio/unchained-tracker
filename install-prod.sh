@@ -36,36 +36,49 @@ sudo apt-get update
 check_status "Updating package list"
 
 # Check and install Go if needed
-# Read required Go version from go.mod
 REQUIRED_GO_VERSION=$(grep "^go " go.mod | cut -d' ' -f2)
 echo "Required Go version from go.mod: $REQUIRED_GO_VERSION"
 
-if ! command -v go &> /dev/null; then
-    echo "Installing Go $REQUIRED_GO_VERSION..."
-    # Download and install specific Go version
-    wget "https://golang.org/dl/go$REQUIRED_GO_VERSION.linux-amd64.tar.gz"
-    sudo rm -rf /usr/local/go
-    sudo tar -C /usr/local -xzf "go$REQUIRED_GO_VERSION.linux-amd64.tar.gz"
-    rm "go$REQUIRED_GO_VERSION.linux-amd64.tar.gz"
-    # Add to PATH if not already there
-    if [[ ":$PATH:" != *":/usr/local/go/bin:"* ]]; then
-        echo "export PATH=\$PATH:/usr/local/go/bin" >> ~/.bashrc
-        export PATH=$PATH:/usr/local/go/bin
+# Install GVM if not already installed
+if ! command -v gvm &> /dev/null; then
+    echo "Installing GVM..."
+    sudo apt-get install -y curl git mercurial make binutils bison gcc build-essential
+    bash < <(curl -s -S -L https://raw.githubusercontent.com/moovweb/gvm/master/binscripts/gvm-installer)
+    source ~/.gvm/scripts/gvm
+    check_status "Installing GVM"
+fi
+
+# Source GVM in current shell
+source ~/.gvm/scripts/gvm
+
+# Install Go version if not already installed via GVM
+if ! gvm list | grep -q "go$REQUIRED_GO_VERSION"; then
+    echo "Installing Go $REQUIRED_GO_VERSION using GVM..."
+    # Install Go 1.4 if needed (required to build newer versions)
+    if ! gvm list | grep -q "go1.4"; then
+        echo "Installing Go 1.4 (required for building newer versions)..."
+        gvm install go1.4 -B
+        gvm use go1.4
     fi
-    check_status "Installing Go"
+    # Install required version
+    gvm install "go$REQUIRED_GO_VERSION"
+    check_status "Installing Go $REQUIRED_GO_VERSION"
+fi
+
+# Use the required version
+echo "Setting Go version to $REQUIRED_GO_VERSION..."
+gvm use "go$REQUIRED_GO_VERSION"
+check_status "Setting Go version"
+
+# Verify correct version is being used
+CURRENT_GO_VERSION=$(go version | awk '{print $3}' | sed 's/go//')
+if [ "$CURRENT_GO_VERSION" != "$REQUIRED_GO_VERSION" ]; then
+    echo "❌ Error: Wrong Go version in use"
+    echo "Expected: $REQUIRED_GO_VERSION"
+    echo "Got: $CURRENT_GO_VERSION"
+    exit 1
 else
-    CURRENT_GO_VERSION=$(go version | awk '{print $3}' | sed 's/go//')
-    echo "Go $CURRENT_GO_VERSION is installed"
-    if [ "$CURRENT_GO_VERSION" != "$REQUIRED_GO_VERSION" ]; then
-        echo "Updating Go to required version $REQUIRED_GO_VERSION..."
-        wget "https://golang.org/dl/go$REQUIRED_GO_VERSION.linux-amd64.tar.gz"
-        sudo rm -rf /usr/local/go
-        sudo tar -C /usr/local -xzf "go$REQUIRED_GO_VERSION.linux-amd64.tar.gz"
-        rm "go$REQUIRED_GO_VERSION.linux-amd64.tar.gz"
-        check_status "Updating Go"
-    else
-        echo "✅ Go version matches requirement"
-    fi
+    echo "✅ Using Go $REQUIRED_GO_VERSION"
 fi
 
 # Only install MySQL if not already installed
