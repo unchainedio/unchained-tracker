@@ -72,6 +72,17 @@ else
     echo "✅ Database $DB_NAME already exists"
 fi
 
+# Configure MySQL password policy
+echo "Configuring MySQL password policy..."
+mysql -u root -p"$MYSQL_ROOT_PASSWORD" -e "
+    SET GLOBAL validate_password.policy=LOW;
+    SET GLOBAL validate_password.length=6;
+    SET GLOBAL validate_password.mixed_case_count=0;
+    SET GLOBAL validate_password.number_count=0;
+    SET GLOBAL validate_password.special_char_count=0;
+"
+check_status "Setting password policy"
+
 # Always recreate the user and permissions to ensure they're correct
 echo "Setting up database user..."
 mysql -u root -p"$MYSQL_ROOT_PASSWORD" -e "
